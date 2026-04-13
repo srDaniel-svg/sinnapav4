@@ -114,8 +114,8 @@ fun BarraSuperior() {
 fun BarraInferior(seleccionado: Int, onSelect: (Int) -> Unit) {
     NavigationBar(containerColor = Color.White) {
         listOf(
-            Triple("Muestras",   Icons.Default.Home,       1),
-            Triple("dashboard", Icons.Default.Science,    0),
+            Triple("Muestras",   Icons.Default.Home,       0),
+            Triple("dashboard", Icons.Default.Science,    1),
             Triple("Mapa",     Icons.Default.Map,        2),
             Triple("Consejos", Icons.Default.Lightbulb,  3)
         ).forEach { (label, icon, index) ->
