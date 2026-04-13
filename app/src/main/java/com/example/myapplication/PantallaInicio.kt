@@ -41,6 +41,9 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import com.google.android.gms.location.LocationServices
+// En tu archivo, agrega esto al inicio
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 
 import android.annotation.SuppressLint
 
@@ -108,7 +111,24 @@ fun BarraSuperior() {
         }
     )
 }
+@Composable
+fun rememberTTS(): TextToSpeech {
+    val context = LocalContext.current
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
 
+    DisposableEffect(Unit) {
+        val engine = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale("es", "MX") // Español
+                // Para voz más "Loquendo" puedes probar es_US o es_ES
+            }
+        }
+        tts = engine
+        onDispose { engine.shutdown() }
+    }
+
+    return tts ?: TextToSpeech(context) {}
+}
 // ── Barra inferior ───────────────────────────────────────────
 @Composable
 fun BarraInferior(seleccionado: Int, onSelect: (Int) -> Unit) {
@@ -291,6 +311,24 @@ fun TarjetaLote(nombre: String, estado: String, colorTexto: Color, colorFondo: C
 
 @Composable
 fun TarjetaRecomendacion() {
+    val context = LocalContext.current
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    var leyendo by remember { mutableStateOf(false) }
+    val texto = "Considera anticipar la rotación de cultivos para fijación de Nitrógeno en el lote Norte."
+
+    DisposableEffect(Unit) {
+        val engine = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale("es", "MX")
+            }
+        }
+        tts = engine
+        onDispose {
+            engine.stop()
+            engine.shutdown()
+        }
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -299,12 +337,56 @@ fun TarjetaRecomendacion() {
         Column(modifier = Modifier.padding(20.dp)) {
             Text("💡", fontSize = 24.sp)
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Recomendación del Día", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(
+                "Recomendación del Día",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                "Considera anticipar la rotación de cultivos para fijación de Nitrógeno en el lote Norte.",
-                fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f)
+                texto,
+                fontSize = 13.sp,
+                color = Color.White.copy(alpha = 0.85f)
             )
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ── Botón de voz ──────────────────────────────
+            Button(
+                onClick = {
+                    val t = tts ?: return@Button
+                    if (leyendo) {
+                        t.stop()
+                        leyendo = false
+                    } else {
+                        t.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "rec")
+                        leyendo = true
+                        // Resetea el ícono cuando termina
+                        t.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                            override fun onStart(id: String?) {}
+                            override fun onDone(id: String?)  { leyendo = false }
+                            override fun onError(id: String?) { leyendo = false }
+                        })
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White.copy(alpha = 0.15f)
+                ),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = if (leyendo) Icons.Default.Stop else Icons.Default.VolumeUp,
+                    contentDescription = null,
+                    tint = Color.White
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = if (leyendo) "Detener" else "Leer en voz alta",
+                    color = Color.White,
+                    fontSize = 13.sp
+                )
+            }
         }
     }
 }
