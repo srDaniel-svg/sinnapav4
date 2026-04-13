@@ -76,8 +76,8 @@ fun PantallaInicio() {
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             when (tabSeleccionado) {
-                0 -> PantallaHome()
-                1 -> PantallaCamara()
+                1 -> PantallaHome()
+                0 -> PantallaCamara()
                 2 -> PantallaMapa()
                 3 -> PantallaRecomendaciones()
             }
@@ -114,8 +114,8 @@ fun BarraSuperior() {
 fun BarraInferior(seleccionado: Int, onSelect: (Int) -> Unit) {
     NavigationBar(containerColor = Color.White) {
         listOf(
-            Triple("Inicio",   Icons.Default.Home,       0),
-            Triple("Muestras", Icons.Default.Science,    1),
+            Triple("Muestras",   Icons.Default.Home,       1),
+            Triple("dashboard", Icons.Default.Science,    0),
             Triple("Mapa",     Icons.Default.Map,        2),
             Triple("Consejos", Icons.Default.Lightbulb,  3)
         ).forEach { (label, icon, index) ->
