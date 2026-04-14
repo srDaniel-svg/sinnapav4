@@ -539,14 +539,17 @@ suspend fun analizarConBackend(bitmap: Bitmap): EstadoEscaner {
 
             val json = JSONObject(responseText)
 
+            // Si el backend anida en "datos", desenvuelve:
+            val data = if (json.has("datos")) json.getJSONObject("datos") else json
+
             EstadoEscaner.Resultado(
                 AnalisisSuelo(
-                    ph        = json.getDouble("ph"),
-                    nitrogeno = json.getDouble("nitrogeno"),
-                    fosforo   = json.getDouble("fosforo"),
-                    potasio   = json.getDouble("potasio"),
-                    hectareas = json.getDouble("hectareas"),
-                    cultivo   = json.getString("cultivo")
+                    ph        = data.optDouble("ph", 0.0),
+                    nitrogeno = data.optDouble("nitrogeno", 0.0),
+                    fosforo   = data.optDouble("fosforo", 0.0),
+                    potasio   = data.optDouble("potasio", 0.0),
+                    hectareas = data.optDouble("hectareas", 0.0),
+                    cultivo   = data.optString("cultivo", "Desconocido")
                 )
             )
 
