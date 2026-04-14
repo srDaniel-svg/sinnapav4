@@ -63,14 +63,13 @@ sealed class EstadoEscaner {
 }
 
 data class AnalisisSuelo(
-    val estadoSalud: String,
-    val porcentajeSalud: Int,
-    val colorEstado: Color,
-    val alertas: List<String>,
-    val planAccion: List<Pair<String, String>>,
-    val notaAgronomo: String
+    val ph: Double,
+    val nitrogeno: Double,
+    val fosforo: Double,
+    val potasio: Double,
+    val hectareas: Double,
+    val cultivo: String
 )
-
 // ── Pantalla principal del escáner ───────────────────────────
 @Composable
 fun PantallaCamaraIA() {
@@ -339,7 +338,17 @@ fun PantallaAnalizando() {
 // ── Pantalla de resultados ────────────────────────────────────
 @Composable
 fun PantallaResultado(bitmap: Bitmap?, analisis: AnalisisSuelo, onNuevoAnalisis: () -> Unit) {
+
+    // Calcular color según pH
+    val colorPh = when {
+        analisis.ph in 6.0..7.0 -> Color(0xFF40916C)  // ideal
+        analisis.ph in 5.0..7.5 -> Color(0xFFE07B39)  // aceptable
+        else                    -> Color(0xFFB5172C)   // crítico
+    }
+
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+
+        // Imagen capturada
         bitmap?.let {
             Box(modifier = Modifier.fillMaxWidth().height(220.dp)) {
                 androidx.compose.foundation.Image(
@@ -367,79 +376,53 @@ fun PantallaResultado(bitmap: Bitmap?, analisis: AnalisisSuelo, onNuevoAnalisis:
 
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
-            ) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Estado: ${analisis.estadoSalud}", fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                        Text("DIAGNÓSTICO VISUAL", fontSize = 10.sp, color = Color.Gray)
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("${analisis.porcentajeSalud}%",
-                            fontSize = 28.sp, fontWeight = FontWeight.Bold, color = analisis.colorEstado)
-                        Text("SALUD", fontSize = 10.sp, color = Color.Gray)
-                    }
-                }
+            // Título
+            Text("Resultado del Análisis", fontSize = 20.sp,
+                fontWeight = FontWeight.Bold, color = VerdeOscuro)
+            Text("Cultivo detectado: ${analisis.cultivo}", fontSize = 13.sp, color = Color.Gray)
+
+            // Tarjeta pH
+            TarjetaMetrica(
+                emoji   = "🧪",
+                titulo  = "pH del Suelo",
+                valor   = analisis.ph.toString(),
+                detalle = "Ideal entre 6.0 y 7.0",
+                color   = colorPh
+            )
+
+            // Fila Nitrógeno + Fósforo
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TarjetaMetricaChica(
+                    modifier = Modifier.weight(1f),
+                    emoji    = "🌿",
+                    titulo   = "Nitrógeno",
+                    valor    = "${analisis.nitrogeno} mg/kg"
+                )
+                TarjetaMetricaChica(
+                    modifier = Modifier.weight(1f),
+                    emoji    = "💧",
+                    titulo   = "Fósforo",
+                    valor    = "${analisis.fosforo} mg/kg"
+                )
             }
 
-            analisis.alertas.forEach { alerta ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3F3))
-                ) {
-                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("⚠️", fontSize = 18.sp)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(alerta, fontSize = 13.sp)
-                    }
-                }
+            // Fila Potasio + Hectáreas
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TarjetaMetricaChica(
+                    modifier = Modifier.weight(1f),
+                    emoji    = "⚡",
+                    titulo   = "Potasio",
+                    valor    = "${analisis.potasio} mg/kg"
+                )
+                TarjetaMetricaChica(
+                    modifier = Modifier.weight(1f),
+                    emoji    = "📐",
+                    titulo   = "Hectáreas",
+                    valor    = "${analisis.hectareas} ha"
+                )
             }
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFFFEDD5)),
-                            contentAlignment = Alignment.Center
-                        ) { Text("⚡", fontSize = 18.sp) }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text("Plan de Acción", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    analisis.planAccion.forEach { (titulo, descripcion) ->
-                        Row(modifier = Modifier.padding(vertical = 6.dp)) {
-                            Text("🌿", fontSize = 16.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(titulo, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text(descripcion, fontSize = 12.sp, color = Color.Gray)
-                            }
-                        }
-                    }
-                }
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFEEF4FF))
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text("NOTA DEL AGRÓNOMO IA", fontSize = 10.sp,
-                        color = Color(0xFF3B5BDB), fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("\"${analisis.notaAgronomo}\"", fontSize = 13.sp, color = Color(0xFF3B5BDB))
-                }
-            }
-
+            // Botón nuevo análisis
             Button(
                 onClick = onNuevoAnalisis,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -454,6 +437,44 @@ fun PantallaResultado(bitmap: Bitmap?, analisis: AnalisisSuelo, onNuevoAnalisis:
     }
 }
 
+// ── Tarjeta grande para pH ────────────────────────────────────
+@Composable
+fun TarjetaMetrica(emoji: String, titulo: String, valor: String, detalle: String, color: Color) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(emoji, fontSize = 28.sp)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(titulo, fontSize = 12.sp, color = Color.Gray)
+                Text(valor, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = color)
+                Text(detalle, fontSize = 11.sp, color = Color.Gray)
+            }
+        }
+    }
+}
+
+// ── Tarjeta chica para los demás valores ─────────────────────
+@Composable
+fun TarjetaMetricaChica(modifier: Modifier, emoji: String, titulo: String, valor: String) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(emoji, fontSize = 22.sp)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(titulo, fontSize = 11.sp, color = Color.Gray)
+            Text(valor, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = VerdeOscuro)
+        }
+    }
+}
 // ── Pantalla de error ─────────────────────────────────────────
 @Composable
 fun PantallaError(mensaje: String, onReintentar: () -> Unit) {
@@ -479,7 +500,7 @@ fun PantallaError(mensaje: String, onReintentar: () -> Unit) {
 suspend fun analizarConBackend(bitmap: Bitmap): EstadoEscaner {
     return withContext(Dispatchers.IO) {
         try {
-            val backendUrl = "https://sinapa-backend.onrender.com/analizar" // ← ajusta si el endpoint es diferente
+            val backendUrl = "https://sinapa-backend.onrender.com/extraer-datos-suelo"
 
             val bitmapReducido = Bitmap.createScaledBitmap(bitmap, 800, 600, true)
             val stream = ByteArrayOutputStream()
@@ -489,7 +510,7 @@ suspend fun analizarConBackend(bitmap: Bitmap): EstadoEscaner {
             val requestBody = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
                 .addFormDataPart(
-                    "image",
+                    "archivo",
                     "suelo.jpg",
                     imageBytes.toRequestBody("image/jpeg".toMediaType())
                 )
@@ -497,7 +518,7 @@ suspend fun analizarConBackend(bitmap: Bitmap): EstadoEscaner {
 
             val client = OkHttpClient.Builder()
                 .connectTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS) // Render free tarda ~50s en arrancar
+                .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
                 .build()
 
             val request = Request.Builder()
@@ -516,35 +537,16 @@ suspend fun analizarConBackend(bitmap: Bitmap): EstadoEscaner {
 
             android.util.Log.d("BACKEND", "Respuesta: $responseText")
 
-            val resultado = JSONObject(responseText)
-            val estadoTexto = resultado.getString("estadoSalud")
-            val porcentaje  = resultado.getInt("porcentajeSalud")
-
-            val colorEstado = when {
-                porcentaje >= 70 -> Color(0xFF40916C)
-                porcentaje >= 40 -> Color(0xFFE07B39)
-                else             -> Color(0xFFB5172C)
-            }
-
-            val alertas = mutableListOf<String>()
-            val alertasJson = resultado.getJSONArray("alertas")
-            for (i in 0 until alertasJson.length()) alertas.add(alertasJson.getString(i))
-
-            val plan = mutableListOf<Pair<String, String>>()
-            val planJson = resultado.getJSONArray("planAccion")
-            for (i in 0 until planJson.length()) {
-                val item = planJson.getJSONObject(i)
-                plan.add(Pair(item.getString("titulo"), item.getString("descripcion")))
-            }
+            val json = JSONObject(responseText)
 
             EstadoEscaner.Resultado(
                 AnalisisSuelo(
-                    estadoSalud     = estadoTexto,
-                    porcentajeSalud = porcentaje,
-                    colorEstado     = colorEstado,
-                    alertas         = alertas,
-                    planAccion      = plan,
-                    notaAgronomo    = resultado.getString("notaAgronomo")
+                    ph        = json.getDouble("ph"),
+                    nitrogeno = json.getDouble("nitrogeno"),
+                    fosforo   = json.getDouble("fosforo"),
+                    potasio   = json.getDouble("potasio"),
+                    hectareas = json.getDouble("hectareas"),
+                    cultivo   = json.getString("cultivo")
                 )
             )
 
@@ -554,7 +556,6 @@ suspend fun analizarConBackend(bitmap: Bitmap): EstadoEscaner {
         }
     }
 }
-
 // ── Utilidad: Uri a Bitmap ────────────────────────────────────
 fun uriToBitmap(context: Context, uri: Uri): Bitmap? {
     return try {
