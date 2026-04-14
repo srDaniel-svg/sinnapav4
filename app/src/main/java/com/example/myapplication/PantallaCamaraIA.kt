@@ -537,9 +537,18 @@ suspend fun analizarConBackend(bitmap: Bitmap): EstadoEscaner {
 
             android.util.Log.d("BACKEND", "Respuesta: $responseText")
 
-            val json = JSONObject(responseText)
+            // El servidor puede devolver el texto envuelto, lo limpiamos
+            val textoLimpio = responseText.trim().removeSurrounding("\"").replace("\\\"", "\"").replace("\\n", "")
+            val json = JSONObject(textoLimpio)
 
-            // Si el backend anida en "datos", desenvuelve:
+// Si el servidor devuelve error, mostrarlo
+            if (json.optString("status") == "error") {
+                return@withContext EstadoEscaner.Error(
+                    json.optString("mensaje", "Error del servidor")
+                )
+            }
+
+// Si el backend anida en "datos", desenvuelve:
             val data = if (json.has("datos")) json.getJSONObject("datos") else json
 
             EstadoEscaner.Resultado(
