@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
@@ -24,7 +23,6 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.animation.core.*
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,7 +47,6 @@ import kotlinx.coroutines.withContext
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -102,8 +99,7 @@ fun PantallaCamaraIA() {
                 bitmapCapturado = bmp
                 estado = EstadoEscaner.Analizando
                 scope.launch {
-                    val resultado = analizarConGemini(bmp)
-                    estado = resultado
+                    estado = analizarConBackend(bmp)
                 }
             }
         }
@@ -125,16 +121,13 @@ fun PantallaCamaraIA() {
                     bitmapCapturado = bitmap
                     estado = EstadoEscaner.Analizando
                     scope.launch {
-                        val resultado = analizarConGemini(bitmap)
-                        estado = resultado
+                        estado = analizarConBackend(bitmap)
                     }
                 },
                 onCancelar = { estado = EstadoEscaner.Inicio }
             )
         }
-        is EstadoEscaner.Analizando -> {
-            PantallaAnalizando()
-        }
+        is EstadoEscaner.Analizando -> PantallaAnalizando()
         is EstadoEscaner.Resultado -> {
             PantallaResultado(
                 bitmap = bitmapCapturado,
@@ -157,7 +150,6 @@ fun PantallaCamaraIA() {
 // ── Pantalla de inicio del escáner ───────────────────────────
 @Composable
 fun PantallaInicioEscaner(onAbrirCamara: () -> Unit, onAbrirGaleria: () -> Unit) {
-    // Animación de burbuja flotante
     val infiniteTransition = rememberInfiniteTransition(label = "float")
     val offsetY by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -168,6 +160,7 @@ fun PantallaInicioEscaner(onAbrirCamara: () -> Unit, onAbrirGaleria: () -> Unit)
         ),
         label = "floatY"
     )
+
     Column(
         modifier = Modifier.fillMaxSize().padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -177,7 +170,6 @@ fun PantallaInicioEscaner(onAbrirCamara: () -> Unit, onAbrirGaleria: () -> Unit)
         Text("Diagnóstico visual y plan de curación.", fontSize = 13.sp, color = Color.Gray)
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Área de captura
         Card(
             modifier = Modifier.fillMaxWidth().height(300.dp),
             shape = RoundedCornerShape(20.dp),
@@ -202,13 +194,9 @@ fun PantallaInicioEscaner(onAbrirCamara: () -> Unit, onAbrirGaleria: () -> Unit)
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Botón cámara
         Button(
             onClick = onAbrirCamara,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .offset (y=offsetY.dp),
+            modifier = Modifier.fillMaxWidth().height(52.dp).offset(y = offsetY.dp),
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(containerColor = VerdeOscuro)
         ) {
@@ -219,7 +207,6 @@ fun PantallaInicioEscaner(onAbrirCamara: () -> Unit, onAbrirGaleria: () -> Unit)
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Botón galería
         OutlinedButton(
             onClick = onAbrirGaleria,
             modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -267,7 +254,6 @@ fun PantallaCamaraCaptura(onFotoTomada: (Bitmap) -> Unit, onCancelar: () -> Unit
             modifier = Modifier.fillMaxSize()
         )
 
-        // Botones
         Column(
             modifier = Modifier.fillMaxSize().padding(bottom = 32.dp),
             verticalArrangement = Arrangement.Bottom,
@@ -278,7 +264,6 @@ fun PantallaCamaraCaptura(onFotoTomada: (Bitmap) -> Unit, onCancelar: () -> Unit
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Cancelar
                 FloatingActionButton(
                     onClick = onCancelar,
                     containerColor = Color.White.copy(alpha = 0.8f),
@@ -288,7 +273,6 @@ fun PantallaCamaraCaptura(onFotoTomada: (Bitmap) -> Unit, onCancelar: () -> Unit
                     Icon(Icons.Default.Close, contentDescription = "Cancelar", tint = Color.DarkGray)
                 }
 
-                // Capturar
                 FloatingActionButton(
                     onClick = {
                         val archivo = File(context.cacheDir, "foto_suelo.jpg")
@@ -337,9 +321,7 @@ fun PantallaAnalizando() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Image(
                 painter = rememberAsyncImagePainter(
-                    model = ImageRequest.Builder(context)
-                        .data(R.raw.loading2)
-                        .build(),
+                    model = ImageRequest.Builder(context).data(R.raw.loading2).build(),
                     imageLoader = imageLoader
                 ),
                 contentDescription = "Analizando",
@@ -349,7 +331,7 @@ fun PantallaAnalizando() {
             Text("Analizando tu suelo...", fontSize = 18.sp,
                 fontWeight = FontWeight.Bold, color = VerdeOscuro)
             Spacer(modifier = Modifier.height(8.dp))
-            Text("La IA está procesando la imagen", fontSize = 13.sp, color = Color.Gray)
+            Text("Conectando con el servidor...", fontSize = 13.sp, color = Color.Gray)
         }
     }
 }
@@ -357,10 +339,7 @@ fun PantallaAnalizando() {
 // ── Pantalla de resultados ────────────────────────────────────
 @Composable
 fun PantallaResultado(bitmap: Bitmap?, analisis: AnalisisSuelo, onNuevoAnalisis: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-    ) {
-        // Imagen capturada
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         bitmap?.let {
             Box(modifier = Modifier.fillMaxWidth().height(220.dp)) {
                 androidx.compose.foundation.Image(
@@ -369,7 +348,6 @@ fun PantallaResultado(bitmap: Bitmap?, analisis: AnalisisSuelo, onNuevoAnalisis:
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
-                // Botón retomar
                 Box(
                     modifier = Modifier.fillMaxSize().padding(12.dp),
                     contentAlignment = Alignment.TopEnd
@@ -389,16 +367,12 @@ fun PantallaResultado(bitmap: Bitmap?, analisis: AnalisisSuelo, onNuevoAnalisis:
 
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
 
-            // Estado de salud
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Estado: ${analisis.estadoSalud}", fontWeight = FontWeight.Bold, fontSize = 17.sp)
                         Text("DIAGNÓSTICO VISUAL", fontSize = 10.sp, color = Color.Gray)
@@ -411,17 +385,13 @@ fun PantallaResultado(bitmap: Bitmap?, analisis: AnalisisSuelo, onNuevoAnalisis:
                 }
             }
 
-            // Alertas
             analisis.alertas.forEach { alerta ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3F3))
                 ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("⚠️", fontSize = 18.sp)
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(alerta, fontSize = 13.sp)
@@ -429,7 +399,6 @@ fun PantallaResultado(bitmap: Bitmap?, analisis: AnalisisSuelo, onNuevoAnalisis:
                 }
             }
 
-            // Plan de acción
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -458,7 +427,6 @@ fun PantallaResultado(bitmap: Bitmap?, analisis: AnalisisSuelo, onNuevoAnalisis:
                 }
             }
 
-            // Nota del agrónomo
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -472,7 +440,6 @@ fun PantallaResultado(bitmap: Bitmap?, analisis: AnalisisSuelo, onNuevoAnalisis:
                 }
             }
 
-            // Botón nuevo análisis
             Button(
                 onClick = onNuevoAnalisis,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -508,103 +475,55 @@ fun PantallaError(mensaje: String, onReintentar: () -> Unit) {
     }
 }
 
-// ── Llamada a Gemini ──────────────────────────────────────────
-suspend fun analizarConGemini(bitmap: Bitmap): EstadoEscaner {
+// ── Llamada al Backend ────────────────────────────────────────
+suspend fun analizarConBackend(bitmap: Bitmap): EstadoEscaner {
     return withContext(Dispatchers.IO) {
         try {
-            val apiKey = "AIzaSyB6yiBhjUPl1gpc6bOVqE4dTwRUIn3iyRQ"
+            val backendUrl = "https://sinapa-backend.onrender.com/analizar" // ← ajusta si el endpoint es diferente
 
-            // Reducir tamaño de imagen para evitar problemas
             val bitmapReducido = Bitmap.createScaledBitmap(bitmap, 800, 600, true)
             val stream = ByteArrayOutputStream()
             bitmapReducido.compress(Bitmap.CompressFormat.JPEG, 80, stream)
-            val base64 = Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+            val imageBytes = stream.toByteArray()
 
-            val prompt = """
-                Analiza esta imagen de suelo agrícola y responde SOLO en este formato JSON exacto sin texto adicional:
-                {
-                  "estadoSalud": "Bueno",
-                  "porcentajeSalud": 75,
-                  "alertas": ["alerta 1", "alerta 2"],
-                  "planAccion": [
-                    {"titulo": "Accion 1", "descripcion": "Descripcion detallada"},
-                    {"titulo": "Accion 2", "descripcion": "Descripcion detallada"}
-                  ],
-                  "notaAgronomo": "Nota tecnica sobre el suelo observado"
-                }
-            """.trimIndent()
-
-            val requestBody = JSONObject().apply {
-                put("contents", JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("parts", JSONArray().apply {
-                            put(JSONObject().apply {
-                                put("inline_data", JSONObject().apply {
-                                    put("mime_type", "image/jpeg")
-                                    put("data", base64)
-                                })
-                            })
-                            put(JSONObject().apply { put("text", prompt) })
-                        })
-                    })
-                })
-            }
+            val requestBody = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart(
+                    "image",
+                    "suelo.jpg",
+                    imageBytes.toRequestBody("image/jpeg".toMediaType())
+                )
+                .build()
 
             val client = OkHttpClient.Builder()
-                .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .connectTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS) // Render free tarda ~50s en arrancar
                 .build()
 
             val request = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
-                .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
+                .url(backendUrl)
+                .post(requestBody)
                 .build()
 
             val response = client.newCall(request).execute()
-            val responseText = response.body?.string() ?: throw Exception("Sin respuesta del servidor")
 
-            // Log para debug
-            android.util.Log.d("GEMINI", "Respuesta: $responseText")
-
-            val json = JSONObject(responseText)
-
-            // Verificar error de API
-            if (json.has("error")) {
-                val errorMsg = json.getJSONObject("error").getString("message")
-                return@withContext EstadoEscaner.Error("Error API: $errorMsg")
+            if (!response.isSuccessful) {
+                return@withContext EstadoEscaner.Error("Error del servidor: ${response.code}")
             }
 
-            // Verificar candidates
-            val candidates = json.optJSONArray("candidates")
-                ?: return@withContext EstadoEscaner.Error("Gemini no pudo analizar la imagen. Intenta con mejor iluminación.")
+            val responseText = response.body?.string()
+                ?: return@withContext EstadoEscaner.Error("Sin respuesta del servidor")
 
-            if (candidates.length() == 0)
-                return@withContext EstadoEscaner.Error("Sin resultados. Intenta con otra foto del suelo.")
+            android.util.Log.d("BACKEND", "Respuesta: $responseText")
 
-            // Verificar si fue bloqueado
-            val candidate = candidates.getJSONObject(0)
-            if (candidate.optString("finishReason") == "SAFETY")
-                return@withContext EstadoEscaner.Error("Imagen bloqueada. Usa una foto clara del suelo.")
-
-            val texto = candidate
-                .getJSONObject("content")
-                .getJSONArray("parts")
-                .getJSONObject(0)
-                .getString("text")
-                .trim()
-                .removePrefix("```json")
-                .removePrefix("```")
-                .removeSuffix("```")
-                .trim()
-
-            val resultado = JSONObject(texto)
+            val resultado = JSONObject(responseText)
             val estadoTexto = resultado.getString("estadoSalud")
-            val porcentaje = resultado.getInt("porcentajeSalud")
+            val porcentaje  = resultado.getInt("porcentajeSalud")
 
             val colorEstado = when {
                 porcentaje >= 70 -> Color(0xFF40916C)
                 porcentaje >= 40 -> Color(0xFFE07B39)
-                else -> Color(0xFFB5172C)
+                else             -> Color(0xFFB5172C)
             }
 
             val alertas = mutableListOf<String>()
@@ -620,17 +539,18 @@ suspend fun analizarConGemini(bitmap: Bitmap): EstadoEscaner {
 
             EstadoEscaner.Resultado(
                 AnalisisSuelo(
-                    estadoSalud = estadoTexto,
+                    estadoSalud     = estadoTexto,
                     porcentajeSalud = porcentaje,
-                    colorEstado = colorEstado,
-                    alertas = alertas,
-                    planAccion = plan,
-                    notaAgronomo = resultado.getString("notaAgronomo")
+                    colorEstado     = colorEstado,
+                    alertas         = alertas,
+                    planAccion      = plan,
+                    notaAgronomo    = resultado.getString("notaAgronomo")
                 )
             )
+
         } catch (e: Exception) {
-            android.util.Log.e("GEMINI", "Error: ${e.message}")
-            EstadoEscaner.Error("Error al analizar: ${e.message}")
+            android.util.Log.e("BACKEND", "Error: ${e.message}")
+            EstadoEscaner.Error("Error al conectar: ${e.message}")
         }
     }
 }
